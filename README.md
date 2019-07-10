@@ -11,16 +11,15 @@ Tensorflow implementation for reproducing main results in the paper [StackGAN: T
 
 
 ### Dependencies
-python 2.7
+python 3.6+
 
-[TensorFlow 0.12](https://www.tensorflow.org/get_started/os_setup)
+[TensorFlow 1.13+](https://www.tensorflow.org/get_started/os_setup)
 
 [Optional] [Torch](http://torch.ch/docs/getting-started.html#_) is needed, if use the pre-trained char-CNN-RNN text encoder.
 
 [Optional] [skip-thought](https://github.com/ryankiros/skip-thoughts) is needed, if use the skip-thought text encoder.
 
 In addition, please add the project folder to PYTHONPATH and `pip install` the following packages:
-- `prettytensor`
 - `progressbar`
 - `python-dateutil`
 - `easydict`

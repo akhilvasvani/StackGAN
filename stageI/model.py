@@ -1,11 +1,14 @@
 from __future__ import division
 from __future__ import print_function
 
-import prettytensor as pt
+# import prettytensor as pt
 import tensorflow as tf
-import misc.custom_ops
-from misc.custom_ops import leaky_rectify
-from misc.config import cfg
+import sys
+
+sys.path.append('./misc')
+
+from custom_ops import fc, conv_batch_normalization, fc_batch_normalization, reshape, Conv2d, Deconv2d, UpSample, add
+from config import cfg
 
 
 class CondGAN(object):
@@ -17,208 +20,171 @@ class CondGAN(object):
         self.df_dim = cfg.GAN.DF_DIM
         self.ef_dim = cfg.GAN.EMBEDDING_DIM
 
-        self.image_shape = image_shape
         self.s = image_shape[0]
-        self.s2, self.s4, self.s8, self.s16 =\
-            int(self.s / 2), int(self.s / 4), int(self.s / 8), int(self.s / 16)
-
-        # Since D is only used during training, we build a template
-        # for safe reuse the variables during computing loss for fake/real/wrong images
-        # We do not do this for G,
-        # because batch_norm needs different options for training and testing
-        if cfg.GAN.NETWORK_TYPE == "default":
-            with tf.variable_scope("d_net"):
-                self.d_encode_img_template = self.d_encode_image()
-                self.d_context_template = self.context_embedding()
-                self.discriminator_template = self.discriminator()
-        elif cfg.GAN.NETWORK_TYPE == "simple":
-            with tf.variable_scope("d_net"):
-                self.d_encode_img_template = self.d_encode_image_simple()
-                self.d_context_template = self.context_embedding()
-                self.discriminator_template = self.discriminator()
-        else:
-            raise NotImplementedError
+        self.s2, self.s4, self.s8, self.s16 = int(self.s / 2), int(self.s / 4), int(self.s / 8), int(self.s / 16)
 
     # g-net
     def generate_condition(self, c_var):
-        conditions =\
-            (pt.wrap(c_var).
-             flatten().
-             custom_fully_connected(self.ef_dim * 2).
-             apply(leaky_rectify, leakiness=0.2))
+        conditions = fc(c_var, self.ef_dim * 2, 'gen_cond/fc', activation_fn=tf.nn.leaky_relu)
         mean = conditions[:, :self.ef_dim]
         log_sigma = conditions[:, self.ef_dim:]
         return [mean, log_sigma]
 
-    def generator(self, z_var):
-        node1_0 =\
-            (pt.wrap(z_var).
-             flatten().
-             custom_fully_connected(self.s16 * self.s16 * self.gf_dim * 8).
-             fc_batch_norm().
-             reshape([-1, self.s16, self.s16, self.gf_dim * 8]))
-        node1_1 = \
-            (node1_0.
-             custom_conv2d(self.gf_dim * 2, k_h=1, k_w=1, d_h=1, d_w=1).
-             conv_batch_norm().
-             apply(tf.nn.relu).
-             custom_conv2d(self.gf_dim * 2, k_h=3, k_w=3, d_h=1, d_w=1).
-             conv_batch_norm().
-             apply(tf.nn.relu).
-             custom_conv2d(self.gf_dim * 8, k_h=3, k_w=3, d_h=1, d_w=1).
-             conv_batch_norm())
-        node1 = \
-            (node1_0.
-             apply(tf.add, node1_1).
-             apply(tf.nn.relu))
+    def generator(self, z_var, training=True):
+        node1_0 = fc(z_var, self.s16 * self.s16 * self.gf_dim * 8, 'g_n1.0/fc')
+        node1_0 = fc_batch_normalization(node1_0, 'g_n1.0/batch_norm')
+        node1_0 = reshape(node1_0, [-1, self.s16, self.s16, self.gf_dim * 8], name='g_n1.0/reshape')
 
-        node2_0 = \
-            (node1.
-             # custom_deconv2d([0, self.s8, self.s8, self.gf_dim * 4], k_h=4, k_w=4).
-             apply(tf.image.resize_nearest_neighbor, [self.s8, self.s8]).
-             custom_conv2d(self.gf_dim * 4, k_h=3, k_w=3, d_h=1, d_w=1).
-             conv_batch_norm())
-        node2_1 = \
-            (node2_0.
-             custom_conv2d(self.gf_dim * 1, k_h=1, k_w=1, d_h=1, d_w=1).
-             conv_batch_norm().
-             apply(tf.nn.relu).
-             custom_conv2d(self.gf_dim * 1, k_h=3, k_w=3, d_h=1, d_w=1).
-             conv_batch_norm().
-             apply(tf.nn.relu).
-             custom_conv2d(self.gf_dim * 4, k_h=3, k_w=3, d_h=1, d_w=1).
-             conv_batch_norm())
-        node2 = \
-            (node2_0.
-             apply(tf.add, node2_1).
-             apply(tf.nn.relu))
+        node1_1 = Conv2d(node1_0, 1, 1, self.gf_dim * 2, 1, 1, name='g_n1.1/conv2d')
+        node1_1 = conv_batch_normalization(node1_1, 'g_n1.1/batch_norm_1', activation_fn=tf.nn.relu,
+                                           is_training=training)
+        node1_1 = Conv2d(node1_1, 3, 3, self.gf_dim * 2, 1, 1, name='g_n1.1/conv2d2')
+        node1_1 = conv_batch_normalization(node1_1, 'g_n1.1/batch_norm_2', activation_fn=tf.nn.relu,
+                                           is_training=training)
+        node1_1 = Conv2d(node1_1, 3, 3, self.gf_dim * 8, 1, 1, name='g_n1.1/conv2d3')
+        node1_1 = conv_batch_normalization(node1_1, 'g_n1.1/batch_norm_3', activation_fn=tf.nn.relu,
+                                           is_training=training)
 
-        output_tensor = \
-            (node2.
-             # custom_deconv2d([0, self.s4, self.s4, self.gf_dim * 2], k_h=4, k_w=4).
-             apply(tf.image.resize_nearest_neighbor, [self.s4, self.s4]).
-             custom_conv2d(self.gf_dim * 2, k_h=3, k_w=3, d_h=1, d_w=1).
-             conv_batch_norm().
-             apply(tf.nn.relu).
-             # custom_deconv2d([0, self.s2, self.s2, self.gf_dim], k_h=4, k_w=4).
-             apply(tf.image.resize_nearest_neighbor, [self.s2, self.s2]).
-             custom_conv2d(self.gf_dim, k_h=3, k_w=3, d_h=1, d_w=1).
-             conv_batch_norm().
-             apply(tf.nn.relu).
-             # custom_deconv2d([0] + list(self.image_shape), k_h=4, k_w=4).
-             apply(tf.image.resize_nearest_neighbor, [self.s, self.s]).
-             custom_conv2d(3, k_h=3, k_w=3, d_h=1, d_w=1).
-             apply(tf.nn.tanh))
+        node1 = add([node1_0, node1_1], name='g_n1_res/add')
+        node1_output = tf.nn.relu(node1)
+
+        node2_0 = UpSample(node1_output, size=[self.s8, self.s8], method=1, align_corners=False, name='g_n2.0/upsample')
+        node2_0 = Conv2d(node2_0, 3, 3, self.gf_dim * 4, 1, 1, name='g_n2.0/conv2d')
+        node2_0 = conv_batch_normalization(node2_0, 'g_n2.0/batch_norm', is_training=training)
+
+        node2_1 = Conv2d(node2_0, 1, 1, self.gf_dim * 1, 1, 1, name='g_n2.1/conv2d')
+        node2_1 = conv_batch_normalization(node2_1, 'g_n2.1/batch_norm', activation_fn=tf.nn.relu, is_training=training)
+        node2_1 = Conv2d(node2_1, 3, 3, self.gf_dim * 1, 1, 1, name='g_n2.1/conv2d2')
+        node2_1 = conv_batch_normalization(node2_1, 'g_n2.1/batch_norm2', activation_fn=tf.nn.relu,
+                                           is_training=training)
+        node2_1 = Conv2d(node2_1, 3, 3, self.gf_dim * 4, 1, 1, name='g_n2.1/conv2d3')
+        node2_1 = conv_batch_normalization(node2_1, 'g_n2.1/batch_norm3', is_training=training)
+
+        node2 = add([node2_0, node2_1], name='g_n2_res/add')
+        node2_output = tf.nn.relu(node2)
+
+        output_tensor = UpSample(node2_output, size=[self.s4, self.s4], method=1, align_corners=False,
+                                 name='g_OT/upsample')
+        output_tensor = Conv2d(output_tensor, 3, 3, self.gf_dim * 2, 1, 1, name='g_OT/conv2d')
+        output_tensor = conv_batch_normalization(output_tensor, 'g_OT/batch_norm', activation_fn=tf.nn.relu,
+                                                 is_training=training)
+        output_tensor = UpSample(output_tensor, size=[self.s2, self.s2], method=1, align_corners=False,
+                                 name='g_OT/upsample2')
+        output_tensor = Conv2d(output_tensor, 3, 3, self.gf_dim, 1, 1, name='g_OT/conv2d2')
+        output_tensor = conv_batch_normalization(output_tensor, 'g_OT/batch_norm2', activation_fn=tf.nn.relu,
+                                                 is_training=training)
+        output_tensor = UpSample(output_tensor, size=[self.s, self.s], method=1, align_corners=False,
+                                 name='g_OT/upsample3')
+        output_tensor = Conv2d(output_tensor, 3, 3, 3, 1, 1, activation_fn=tf.nn.tanh, name='g_OT/conv2d3')
         return output_tensor
 
-    def generator_simple(self, z_var):
-        output_tensor =\
-            (pt.wrap(z_var).
-             flatten().
-             custom_fully_connected(self.s16 * self.s16 * self.gf_dim * 8).
-             reshape([-1, self.s16, self.s16, self.gf_dim * 8]).
-             conv_batch_norm().
-             apply(tf.nn.relu).
-             custom_deconv2d([0, self.s8, self.s8, self.gf_dim * 4], k_h=4, k_w=4).
-             # apply(tf.image.resize_nearest_neighbor, [self.s8, self.s8]).
-             # custom_conv2d(self.gf_dim * 4, k_h=3, k_w=3, d_h=1, d_w=1).
-             conv_batch_norm().
-             apply(tf.nn.relu).
-             custom_deconv2d([0, self.s4, self.s4, self.gf_dim * 2], k_h=4, k_w=4).
-             # apply(tf.image.resize_nearest_neighbor, [self.s4, self.s4]).
-             # custom_conv2d(self.gf_dim * 2, k_h=3, k_w=3, d_h=1, d_w=1).
-             conv_batch_norm().
-             apply(tf.nn.relu).
-             custom_deconv2d([0, self.s2, self.s2, self.gf_dim], k_h=4, k_w=4).
-             # apply(tf.image.resize_nearest_neighbor, [self.s2, self.s2]).
-             # custom_conv2d(self.gf_dim, k_h=3, k_w=3, d_h=1, d_w=1).
-             conv_batch_norm().
-             apply(tf.nn.relu).
-             custom_deconv2d([0] + list(self.image_shape), k_h=4, k_w=4).
-             # apply(tf.image.resize_nearest_neighbor, [self.s, self.s]).
-             # custom_conv2d(3, k_h=3, k_w=3, d_h=1, d_w=1).
-             apply(tf.nn.tanh))
+    def generator_simple(self, z_var, training=True):
+        output_tensor = fc(z_var, self.s16 * self.s16 * self.gf_dim * 8, 'g_simple_OT/fc')
+        output_tensor = reshape(output_tensor, [-1, self.s16, self.s16, self.gf_dim * 8], name='g_simple_OT/reshape')
+        output_tensor = conv_batch_normalization(output_tensor, 'g_simple_OT/batch_norm', activation_fn=tf.nn.relu,
+                                                 is_training=training)
+        output_tensor = Deconv2d(output_tensor, [0, self.s8, self.s8, self.gf_dim * 4], name='g_simple_OT/deconv2d',
+                                 k_h=4, k_w=4)
+        output_tensor = conv_batch_normalization(output_tensor, 'g_simple_OT/batch_norm2', activation_fn=tf.nn.relu,
+                                                 is_training=training)
+        output_tensor = Deconv2d(output_tensor, [0, self.s4, self.s4, self.gf_dim * 2], name='g_simple_OT/deconv2d2',
+                                 k_h=4, k_w=4)
+        output_tensor = conv_batch_normalization(output_tensor, 'g_simple_OT/batch_norm3', activation_fn=tf.nn.relu,
+                                                 is_training=training)
+        output_tensor = Deconv2d(output_tensor, [0, self.s2, self.s2, self.gf_dim], name='g_simple_OT/deconv2d3',
+                                 k_h=4, k_w=4)
+        output_tensor = conv_batch_normalization(output_tensor, 'g_simple_OT/batch_norm4', activation_fn=tf.nn.relu,
+                                                 is_training=training)
+        output_tensor = Deconv2d(output_tensor, [0] + list(self.image_shape), name='g_simple_OT/deconv2d4',
+                                 k_h=4, k_w=4, activation_fn=tf.nn.tanh)
+
         return output_tensor
 
-    def get_generator(self, z_var):
+
+    def get_generator(self, z_var, is_training):
         if cfg.GAN.NETWORK_TYPE == "default":
-            return self.generator(z_var)
+            return self.generator(z_var, training=is_training)
         elif cfg.GAN.NETWORK_TYPE == "simple":
-            return self.generator_simple(z_var)
+            return self.generator_simple(z_var, training=is_training)
         else:
             raise NotImplementedError
 
     # d-net
-    def context_embedding(self):
-        template = (pt.template("input").
-                    custom_fully_connected(self.ef_dim).
-                    apply(leaky_rectify, leakiness=0.2))
+    def context_embedding(self, inputs=None, if_reuse=None):
+        template = fc(inputs, self.ef_dim, 'd_embedd/fc', activation_fn=tf.nn.leaky_relu, reuse=if_reuse)
         return template
 
-    def d_encode_image(self):
-        node1_0 = \
-            (pt.template("input").
-             custom_conv2d(self.df_dim, k_h=4, k_w=4).
-             apply(leaky_rectify, leakiness=0.2).
-             custom_conv2d(self.df_dim * 2, k_h=4, k_w=4).
-             conv_batch_norm().
-             apply(leaky_rectify, leakiness=0.2).
-             custom_conv2d(self.df_dim * 4, k_h=4, k_w=4).
-             conv_batch_norm().
-             custom_conv2d(self.df_dim * 8, k_h=4, k_w=4).
-             conv_batch_norm())
-        node1_1 = \
-            (node1_0.
-             custom_conv2d(self.df_dim * 2, k_h=1, k_w=1, d_h=1, d_w=1).
-             conv_batch_norm().
-             apply(leaky_rectify, leakiness=0.2).
-             custom_conv2d(self.df_dim * 2, k_h=3, k_w=3, d_h=1, d_w=1).
-             conv_batch_norm().
-             apply(leaky_rectify, leakiness=0.2).
-             custom_conv2d(self.df_dim * 8, k_h=3, k_w=3, d_h=1, d_w=1).
-             conv_batch_norm())
+    def d_encode_image(self, training=True, inputs=None, if_reuse=None):
+        node1_0 = Conv2d(inputs, 4, 4, self.df_dim, 2, 2, name='d_n1.0/conv2d', activation_fn=tf.nn.leaky_relu,
+                         reuse=if_reuse)
+        node1_0 = Conv2d(node1_0, 4, 4, self.df_dim * 2, 2, 2, name='d_n1.0/conv2d2', reuse=if_reuse)
+        node1_0 = conv_batch_normalization(node1_0, 'd_n1.0/batch_norm', is_training=training,
+                                           activation_fn=tf.nn.leaky_relu, reuse=if_reuse)
+        node1_0 = Conv2d(node1_0, 4, 4, self.df_dim * 4, 2, 2, name='d_n1.0/conv2d3', reuse=if_reuse)
+        node1_0 = conv_batch_normalization(node1_0, 'd_n1.0/batch_norm2', is_training=training, reuse=if_reuse)
+        node1_0 = Conv2d(node1_0, 4, 4, self.df_dim * 8, 2, 2, name='d_n1.0/conv2d4', reuse=if_reuse)
+        node1_0 = conv_batch_normalization(node1_0, 'd_n1.0/batch_norm3', is_training=training, reuse=if_reuse)
 
-        node1 = \
-            (node1_0.
-             apply(tf.add, node1_1).
-             apply(leaky_rectify, leakiness=0.2))
+        node1_1 = Conv2d(node1_0, 1, 1, self.df_dim * 2, 1, 1, name='d_n1.1/conv2d', reuse=if_reuse)
+        node1_1 = conv_batch_normalization(node1_1, 'd_n1.1/batch_norm', is_training=training,
+                                           activation_fn=tf.nn.leaky_relu, reuse=if_reuse)
+        node1_1 = Conv2d(node1_1, 3, 3, self.df_dim * 2, 1, 1, name='d_n1.1/conv2d2', reuse=if_reuse)
+        node1_1 = conv_batch_normalization(node1_1, 'd_n1.1/batch_norm2', is_training=training,
+                                           activation_fn=tf.nn.leaky_relu, reuse=if_reuse)
+        node1_1 = Conv2d(node1_1, 3, 3, self.df_dim * 8, 1, 1, name='d_n1.1/conv2d3', reuse=if_reuse)
+        node1_1 = conv_batch_normalization(node1_1, 'd_n1.1/batch_norm3', is_training=training, reuse=if_reuse)
+
+        node1 = add([node1_0, node1_1], name='d_n1_res/add')
+        node1 = tf.nn.leaky_relu(node1)
 
         return node1
 
-    def d_encode_image_simple(self):
-        template = \
-            (pt.template("input").
-             custom_conv2d(self.df_dim, k_h=4, k_w=4).
-             apply(leaky_rectify, leakiness=0.2).
-             custom_conv2d(self.df_dim * 2, k_h=4, k_w=4).
-             conv_batch_norm().
-             apply(leaky_rectify, leakiness=0.2).
-             custom_conv2d(self.df_dim * 4, k_h=4, k_w=4).
-             conv_batch_norm().
-             apply(leaky_rectify, leakiness=0.2).
-             custom_conv2d(self.df_dim * 8, k_h=4, k_w=4).
-             conv_batch_norm().
-             apply(leaky_rectify, leakiness=0.2))
+    def d_encode_image_simple(self, training=True, inputs=None, if_reuse=None):
+        template = Conv2d(inputs, 4, 4, self.df_dim, 2, 2, activation_fn=tf.nn.leaky_relu, name='d_template/conv2d',
+                          reuse=if_reuse)
+        template = Conv2d(template, 4, 4, self.df_dim * 2, 2, 2, name='d_template/conv2d2', reuse=if_reuse)
+        template = conv_batch_normalization(template, 'd_template/batch_norm', is_training=training,
+                                            activation_fn=tf.nn.leaky_relu, reuse=if_reuse)
+        template = Conv2d(template, 4, 4, self.df_dim * 4, 2, 2, name='d_template/conv2d3', reuse=if_reuse)
+        template = conv_batch_normalization(template, 'd_template/batch_norm2', is_training=training,
+                                            activation_fn=tf.nn.leaky_relu, reuse=if_reuse)
+        template = Conv2d(template, 4, 4, self.df_dim * 8, 2, 2, name='d_template/conv2d4', reuse=if_reuse)
+        template = conv_batch_normalization(template, 'd_template/batch_norm3', is_training=training,
+                                            activation_fn=tf.nn.leaky_relu, reuse=if_reuse)
 
         return template
 
-    def discriminator(self):
-        template = \
-            (pt.template("input").  # 128*9*4*4
-             custom_conv2d(self.df_dim * 8, k_h=1, k_w=1, d_h=1, d_w=1).  # 128*8*4*4
-             conv_batch_norm().
-             apply(leaky_rectify, leakiness=0.2).
-             # custom_fully_connected(1))
-             custom_conv2d(1, k_h=self.s16, k_w=self.s16, d_h=self.s16, d_w=self.s16))
+    def discriminator(self, training=True, inputs=None, if_reuse=None):
+        template = Conv2d(inputs, 1, 1, self.df_dim * 8, 1, 1, name='d_template/conv2d', reuse=if_reuse)
+        template = conv_batch_normalization(template, 'd_template/batch_norm', is_training=training,
+                                            activation_fn=tf.nn.leaky_relu, reuse=if_reuse)
+        template = Conv2d(template, self.s16, self.s16, 1, self.s16, self.s16, name='d_template/conv2d2',
+                          reuse=if_reuse)
 
         return template
 
-    def get_discriminator(self, x_var, c_var):
-        x_code = self.d_encode_img_template.construct(input=x_var)
 
-        c_code = self.d_context_template.construct(input=c_var)
-        c_code = tf.expand_dims(tf.expand_dims(c_code, 1), 1)
-        c_code = tf.tile(c_code, [1, self.s16, self.s16, 1])
+    # Since D is only used during training, we build a template
+    # for safe reuse the variables during computing loss for fake/real/wrong images
+    # We do not do this for G,
+    # because batch_norm needs different options for training and testing
+    def get_discriminator(self, x_var, c_var, is_training, no_reuse=None):
+        if cfg.GAN.NETWORK_TYPE == "default":
+            x_code = self.d_encode_image(training=is_training, inputs=x_var, if_reuse=no_reuse)
+            c_code = self.context_embedding(inputs=c_var, if_reuse=no_reuse)
+            c_code = tf.expand_dims(tf.expand_dims(c_code, 1), 1)
+            c_code = tf.tile(c_code, [1, self.s16, self.s16, 1])
+            x_c_code = tf.concat([x_code, c_code], 3)
 
-        x_c_code = tf.concat(3, [x_code, c_code])
-        return self.discriminator_template.construct(input=x_c_code)
+            return self.discriminator(training=is_training, inputs=x_c_code, if_reuse=no_reuse)
+
+        elif cfg.GAN.NETWORK_TYPE == "simple":
+            x_code = self.d_encode_image_simple(training=is_training, inputs=x_var, if_reuse=no_reuse)
+            c_code = self.context_embedding(inputs=c_var, if_reuse=no_reuse)
+            c_code = tf.expand_dims(tf.expand_dims(c_code, 1), 1)
+            c_code = tf.tile(c_code, [1, self.s16, self.s16, 1])
+            x_c_code = tf.concat([x_code, c_code], 3)
+
+            return self.discriminator(training=is_training, inputs=x_c_code, if_reuse=no_reuse)
+        else:
+            raise NotImplementedError

@@ -6,9 +6,12 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import scipy.misc
 import os
 import errno
+
+# > Python3
+from skimage.transform import resize
+import imageio
 
 
 def get_image(image_path, image_size, is_crop=False, bbox=None):
@@ -43,14 +46,17 @@ def transform(image, image_size, is_crop, bbox):
     image = colorize(image)
     if is_crop:
         image = custom_crop(image, bbox)
-    #
-    transformed_image =\
-        scipy.misc.imresize(image, [image_size, image_size], 'bicubic')
-    return np.array(transformed_image)
+    transformed_image = resize(image, [image_size, image_size], order=3)
+    # order = 3 means bicubic
+    #https: // scikit - image.org / docs / dev / api / skimage.transform.html  # skimage.transform.resize
+
+        #scipy.misc.imresize(image, [image_size, image_size], 'bicubic')
+    return transformed_image
+    #return np.array(transformed_image)
 
 
 def imread(path):
-    img = scipy.misc.imread(path)
+    img = imageio.imread(path)
     if len(img.shape) == 0:
         raise ValueError(path + " got loaded as a dimensionless array!")
     return img.astype(np.float)
@@ -64,6 +70,11 @@ def colorize(img):
         img = img[:, :, 0:3]
     return img
 
+
+def convert_to_uint8(img):
+    img = (img + 1.) * (255 / 2.)
+    img = img.astype(np.uint8)
+    return img
 
 def mkdir_p(path):
     try:
