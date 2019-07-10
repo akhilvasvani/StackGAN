@@ -14,7 +14,7 @@ import sys
 sys.path.append('./misc')
 
 from config import cfg
-from utils import mkdir_p, convert_to_uint8
+from utils import mkdir_p
 
 TINY = 1e-8
 
@@ -220,8 +220,8 @@ class CondGANTrainer(object):
         gen_samples, img_summary = sess.run([self.superimages, self.image_summary], feed_dict)
 
         # save images generated for train and test captions
-        imageio.imwrite('%s/train.jpg' % (self.log_dir), convert_to_uint8(gen_samples[0]))
-        imageio.imwrite('%s/test.jpg' % (self.log_dir), convert_to_uint8(gen_samples[1]))
+        imageio.imwrite('%s/train.jpg' % (self.log_dir), gen_samples[0])
+        imageio.imwrite('%s/test.jpg' % (self.log_dir), gen_samples[1])
 
         # pfi_train = open(self.log_dir + "/train.txt", "w")
         pfi_test = open(self.log_dir + "/test.txt", "w")
@@ -355,7 +355,7 @@ class CondGANTrainer(object):
 
             superimage = np.concatenate(superimage, axis=1)
             fullpath = '%s_sentence%d.jpg' % (s_tmp, sentenceID)
-            imageio.imwrite(fullpath, convert_to_uint8(superimage))
+            imageio.imwrite(fullpath, superimage)
 
     def eval_one_dataset(self, sess, dataset, save_dir, subset='train'):
         count = 0
