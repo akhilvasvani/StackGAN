@@ -61,10 +61,6 @@ if __name__ == "__main__":
     algo = CondGANTrainer(model=model, dataset=dataset, ckt_logs_dir=ckt_logs_dir)
 
     if cfg.TRAIN.FLAG:
-        var_list = checkpoint_utils.list_variables(cfg.TRAIN.PRETRAINED_MODEL)
-        # var_list = checkpoint_utils.list_variables('models/birds_model_164000.ckpt')
-        for v in var_list:
-            print(v)
         algo.train()
     else:
         ''' For every input text embedding/sentence in the

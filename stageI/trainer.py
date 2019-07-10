@@ -146,12 +146,17 @@ class CondGANTrainer(object):
         g_vars = [var for var in all_vars if var.name.startswith('g_')]
         d_vars = [var for var in all_vars if var.name.startswith('d_')]
 
-        generator_opt = tf.train.AdamOptimizer(self.generator_lr, beta1=0.5)
-        self.generator_trainer = generator_opt.minimize(generator_loss, var_list=g_vars)
+        update_ops_D = [var for var in tf.get_collection(tf.GraphKeys.UPDATE_OPS) if var.name.startswith('d_')]
+        update_ops_G = [var for var in tf.get_collection(tf.GraphKeys.UPDATE_OPS) if var.name.startswith('g_')]
 
-        discriminator_opt = tf.train.AdamOptimizer(self.discriminator_lr, beta1=0.5)
+        with tf.control_dependencies(update_ops_G):
+            generator_opt = tf.train.AdamOptimizer(self.generator_lr, beta1=0.5)
+            self.generator_trainer = generator_opt.minimize(generator_loss, var_list=g_vars)
 
-        self.discriminator_trainer = discriminator_opt.minimize(discriminator_loss, var_list=d_vars)
+        with tf.control_dependencies(update_ops_D):
+            discriminator_opt = tf.train.AdamOptimizer(self.discriminator_lr, beta1=0.5)
+            self.discriminator_trainer = discriminator_opt.minimize(discriminator_loss, var_list=d_vars)
+
         self.log_vars.append(("g_learning_rate", self.generator_lr))
         self.log_vars.append(("d_learning_rate", self.discriminator_lr))
 

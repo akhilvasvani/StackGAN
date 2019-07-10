@@ -62,10 +62,6 @@ if __name__ == "__main__":
     if cfg.TRAIN.FLAG:
         algo.train()
     else:
-        # var_list = checkpoint_utils.list_variables(cfg.TRAIN.PRETRAINED_MODEL)
-        # # var_list = checkpoint_utils.list_variables('models/birds_model_164000.ckpt')
-        # for v in var_list:
-        #     print(v)
         ''' For every input text embedding/sentence in the
         training and test datasets, generate cfg.TRAIN.NUM_COPY
         images with randomness from noise z and conditioning augmentation.'''

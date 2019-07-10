@@ -182,8 +182,12 @@ class CondGANTrainer(object):
         all_vars = tf.trainable_variables()
         tarin_vars = [var for var in all_vars if var.name.startswith(key_word)]
 
-        opt = tf.train.AdamOptimizer(learning_rate, beta1=0.5)
-        trainer = opt.minimize(loss, var_list=tarin_vars)
+        update_ops_vars = [var for var in tf.get_collection(tf.GraphKeys.UPDATE_OPS) if var.name.startswith(key_word)]
+
+        with tf.control_dependencies(update_ops_vars):
+            opt = tf.train.AdamOptimizer(learning_rate, beta1=0.5)
+            trainer = opt.minimize(loss, var_list=tarin_vars)
+
         return trainer
 
     def prepare_trainer(self, discriminator_loss, generator_loss, hr_discriminator_loss, hr_generator_loss):
@@ -367,7 +371,6 @@ class CondGANTrainer(object):
 
     def train(self):
         config = tf.ConfigProto(allow_soft_placement=True)
-        config.gpu_options.per_process_gpu_memory_fraction = 0.7
         with tf.Session(config=config) as sess:
             with tf.device("/gpu:%d" % cfg.GPU_ID):
                 counter = self.build_model(sess)
@@ -542,7 +545,6 @@ class CondGANTrainer(object):
 
     def evaluate(self):
         config = tf.ConfigProto(allow_soft_placement=True)
-        config.gpu_options.per_process_gpu_memory_fraction = 0.7
         with tf.Session(config=config) as sess:
             with tf.device("/gpu:%d" % cfg.GPU_ID):
                 if self.model_path.find('.ckpt') != -1:
