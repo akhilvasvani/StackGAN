@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 #
 # Extract text embeddings from the encoder
 #
@@ -16,7 +17,7 @@ th demo/get_embedding.lua
 #
 # Generate image from text embeddings
 #
-python demo/demo.py \
+python3 demo/demo.py \
 --cfg demo/cfg/flowers-demo.yml \
 --gpu ${GPU} \
 --caption_path ${CAPTION_PATH}.t7

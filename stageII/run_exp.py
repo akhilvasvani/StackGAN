@@ -1,24 +1,20 @@
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
-import dateutil
 import dateutil.tz
 import datetime
 import argparse
 import pprint
 
 import sys
-sys.path.append('./misc')
+sys.path.append('misc')
 sys.path.append('stageII')
 
 from datasets import TextDataset
-from model import CondGAN
-from trainer import CondGANTrainer
 from utils import mkdir_p
 from config import cfg, cfg_from_file
-
-from tensorflow.contrib.framework.python.framework import checkpoint_utils
+from model import CondGAN
+from trainer import CondGANTrainer
 
 
 def parse_args():

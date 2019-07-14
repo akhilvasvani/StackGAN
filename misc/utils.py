@@ -76,6 +76,9 @@ def convert_to_uint8(img):
     img = img.astype(np.uint8)
     return img
 
+def caption_convert(caption):
+    return caption.decode("utf-8")
+
 def mkdir_p(path):
     try:
         os.makedirs(path)

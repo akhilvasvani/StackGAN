@@ -48,7 +48,7 @@ __C.TRAIN.B_WRONG = True
 __C.TRAIN.COEFF = edict()
 __C.TRAIN.COEFF.KL = 2.0
 
-__C.TRAIN.FINETUNE_LR = False
+__C.TRAIN.FINETUNE_LR = True  # False
 __C.TRAIN.FT_LR_RETIO = 0.1
 
 # Modal options

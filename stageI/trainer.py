@@ -1,17 +1,15 @@
 from __future__ import division
 from __future__ import print_function
+from six.moves import range
+from progressbar import ETA, Bar, Percentage, ProgressBar
 
 import tensorflow as tf
 import numpy as np
 import os
-from six.moves import range
-from progressbar import ETA, Bar, Percentage, ProgressBar
-
-# > Python3
 import imageio
 
 import sys
-sys.path.append('./misc')
+sys.path.append('misc')
 
 from config import cfg
 from utils import mkdir_p
@@ -78,16 +76,16 @@ class CondGANTrainer(object):
     def init_opt(self):
         self.build_placeholder()
 
-        with tf.variable_scope("g_net"):
+        with tf.variable_scope("g_net"):  # For training
             # ####get output from G network################################
             c, kl_loss = self.sample_encoded_context(self.embeddings)
             z = tf.random_normal([self.batch_size, cfg.Z_DIM])
             self.log_vars.append(("hist_c", c))
             self.log_vars.append(("hist_z", z))
 
-            fake_images = self.model.get_generator(tf.concat([c, z], 1), True)  # training = True
+            fake_images = self.model.get_generator(tf.concat([c, z], 1), True)  # set training to be True
 
-        with tf.variable_scope("d_net"):  #, reuse=tf.AUTO_REUSE):  # For training
+        with tf.variable_scope("d_net"):  # For training
             # ####get discriminator_loss and generator_loss ###################
             discriminator_loss, generator_loss = self.compute_losses(self.images, self.wrong_images, fake_images,
                                                                      self.embeddings)
@@ -101,7 +99,7 @@ class CondGANTrainer(object):
             # #######define self.g_sum, self.d_sum,....########################
             self.define_summaries()
 
-        with tf.variable_scope("g_net", reuse=True):
+        with tf.variable_scope("g_net", reuse=True):  # For testing
             self.sampler()
         self.visualization(cfg.TRAIN.NUM_COPY)
         print("success")
@@ -113,10 +111,11 @@ class CondGANTrainer(object):
             z = tf.zeros([self.batch_size, cfg.Z_DIM])  # Expect similar BGs
         else:
             z = tf.random_normal([self.batch_size, cfg.Z_DIM])
-        self.fake_images = self.model.get_generator(tf.concat([c, z], 1), False)
+        self.fake_images = self.model.get_generator(tf.concat([c, z], 1), False)  # for testing
 
     def compute_losses(self, images, wrong_images, fake_images, embeddings):
         real_logit = self.model.get_discriminator(images, embeddings, True)
+        # Reuse the weights
         wrong_logit = self.model.get_discriminator(wrong_images, embeddings, True, no_reuse=tf.AUTO_REUSE)
         fake_logit = self.model.get_discriminator(fake_images, embeddings, True, no_reuse=tf.AUTO_REUSE)
 
@@ -146,14 +145,15 @@ class CondGANTrainer(object):
         g_vars = [var for var in all_vars if var.name.startswith('g_')]
         d_vars = [var for var in all_vars if var.name.startswith('d_')]
 
+        # Update the trainable variables
         update_ops_D = [var for var in tf.get_collection(tf.GraphKeys.UPDATE_OPS) if var.name.startswith('d_')]
         update_ops_G = [var for var in tf.get_collection(tf.GraphKeys.UPDATE_OPS) if var.name.startswith('g_')]
 
-        with tf.control_dependencies(update_ops_G):
+        with tf.control_dependencies(update_ops_G):  # Update the moving mean and variance from the batch normalization
             generator_opt = tf.train.AdamOptimizer(self.generator_lr, beta1=0.5)
             self.generator_trainer = generator_opt.minimize(generator_loss, var_list=g_vars)
 
-        with tf.control_dependencies(update_ops_D):
+        with tf.control_dependencies(update_ops_D):  # Update the moving mean and variance from the batch normalization
             discriminator_opt = tf.train.AdamOptimizer(self.discriminator_lr, beta1=0.5)
             self.discriminator_trainer = discriminator_opt.minimize(discriminator_loss, var_list=d_vars)
 
@@ -248,7 +248,6 @@ class CondGANTrainer(object):
         if len(self.model_path) > 0:
             print("Reading model parameters from %s" % self.model_path)
             restore_vars = tf.global_variables()
-            # restore_vars = tf.all_variables()
             # all_vars = tf.all_variables()
             # restore_vars = [var for var in all_vars if
             #                 var.name.startswith('g_') or

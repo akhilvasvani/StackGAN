@@ -1,22 +1,20 @@
 from __future__ import division
 from __future__ import print_function
 
-# import prettytensor as pt
 import tensorflow as tf
 import numpy as np
 import imageio
-# import scipy.misc
 import os
 import argparse
 from PIL import Image, ImageDraw, ImageFont
 
 import sys
-sys.path.append('./misc')
+sys.path.append('misc')
 sys.path.append('stageII')
 
-from config import cfg, cfg_from_file
-from utils import mkdir_p
-from model import CondGAN
+from misc.config import cfg, cfg_from_file
+from misc.utils import mkdir_p
+from stageII.model import CondGAN
 from skimage.transform import resize
 
 
@@ -52,7 +50,7 @@ def build_model(sess, embedding_dim, batch_size):
     model = CondGAN(lr_imsize=cfg.TEST.LR_IMSIZE, hr_lr_ratio=int(cfg.TEST.HR_IMSIZE/cfg.TEST.LR_IMSIZE))
 
     embeddings = tf.placeholder(tf.float32, [batch_size, embedding_dim], name='conditional_embeddings')
-    # with pt.defaults_scope(phase=pt.Phase.test):
+
     with tf.variable_scope("g_net"):
         c = sample_encoded_context(embeddings, model)
         z = tf.random_normal([batch_size, cfg.Z_DIM])

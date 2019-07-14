@@ -1,11 +1,10 @@
 from __future__ import division
 from __future__ import print_function
 
-# import prettytensor as pt
 import tensorflow as tf
 import sys
 
-sys.path.append('./misc')
+sys.path.append('misc')
 
 from custom_ops import fc, conv_batch_normalization, fc_batch_normalization, reshape, Conv2d, Deconv2d, UpSample, add
 from config import cfg

@@ -1,18 +1,16 @@
 from __future__ import division
 from __future__ import print_function
 
-# import prettytensor as pt
 import tensorflow as tf
 import numpy as np
 import imageio
-# import scipy.misc
 import os
 from six.moves import range
 from progressbar import ETA, Bar, Percentage, ProgressBar
 from PIL import Image, ImageDraw, ImageFont
 
 import sys
-sys.path.append('./misc')
+sys.path.append('misc')
 
 from config import cfg
 from utils import mkdir_p
@@ -91,13 +89,13 @@ class CondGANTrainer(object):
         self.build_placeholder()
 
         # ####get output from G network####################################
-        with tf.variable_scope("g_net"):
+        with tf.variable_scope("g_net"):  # For training
             c, kl_loss = self.sample_encoded_context(self.embeddings)
             z = tf.random_normal([self.batch_size, cfg.Z_DIM])
             self.log_vars.append(("hist_c", c))
             self.log_vars.append(("hist_z", z))
             fake_images = self.model.get_generator(tf.concat([c, z], 1), True)
-        with tf.variable_scope("d_net"):
+        with tf.variable_scope("d_net"):  # For training
             # ####get discriminator_loss and generator_loss ###################
             discriminator_loss, generator_loss = self.compute_losses(self.images, self.wrong_images, fake_images,
                                                                      self.embeddings, flag='lr')
@@ -107,12 +105,12 @@ class CondGANTrainer(object):
             self.log_vars.append(("d_loss", discriminator_loss))
 
         # #### For hr_g and hr_d #########################################
-        with tf.variable_scope("hr_g_net"):
+        with tf.variable_scope("hr_g_net"):  # For training
             hr_c, hr_kl_loss = self.sample_encoded_context(self.embeddings)
             self.log_vars.append(("hist_hr_c", hr_c))
             hr_fake_images = self.model.hr_get_generator(fake_images, hr_c, True)
 
-        with tf.variable_scope("hr_d_net"):
+        with tf.variable_scope("hr_d_net"):  # For training
             # get losses
             hr_discriminator_loss, hr_generator_loss = self.compute_losses(self.hr_images, self.hr_wrong_images,
                                                                            hr_fake_images, self.embeddings, flag='hr')
@@ -129,21 +127,23 @@ class CondGANTrainer(object):
         print("success")
 
     def sampler(self):
-        with tf.variable_scope("g_net", reuse=True):
+        with tf.variable_scope("g_net", reuse=True):  # For testing
             c, _ = self.sample_encoded_context(self.embeddings)
             z = tf.random_normal([self.batch_size, cfg.Z_DIM])
             self.fake_images = self.model.get_generator(tf.concat([c, z], 1), False)
-        with tf.variable_scope("hr_g_net", reuse=True):
+        with tf.variable_scope("hr_g_net", reuse=True):  # For testing
             hr_c, _ = self.sample_encoded_context(self.embeddings)
             self.hr_fake_images = self.model.hr_get_generator(self.fake_images, hr_c, False)
 
     def compute_losses(self, images, wrong_images, fake_images, embeddings, flag='lr'):
         if flag == 'lr':
             real_logit = self.model.get_discriminator(images, embeddings, True)
+            # Reuse the weights
             wrong_logit = self.model.get_discriminator(wrong_images, embeddings, True, no_reuse=tf.AUTO_REUSE)
             fake_logit = self.model.get_discriminator(fake_images, embeddings, True, no_reuse=tf.AUTO_REUSE)
         else:
             real_logit = self.model.hr_get_discriminator(images, embeddings, True)
+            # Reuse the weights
             wrong_logit = self.model.hr_get_discriminator(wrong_images, embeddings, True, no_reuse=tf.AUTO_REUSE)
             fake_logit = self.model.hr_get_discriminator(fake_images, embeddings, True, no_reuse=tf.AUTO_REUSE)
 
@@ -182,8 +182,9 @@ class CondGANTrainer(object):
         all_vars = tf.trainable_variables()
         tarin_vars = [var for var in all_vars if var.name.startswith(key_word)]
 
+        # Update the specific weights
         update_ops_vars = [var for var in tf.get_collection(tf.GraphKeys.UPDATE_OPS) if var.name.startswith(key_word)]
-
+        # Only update the moving mean and variance (from the batch normalization)
         with tf.control_dependencies(update_ops_vars):
             opt = tf.train.AdamOptimizer(learning_rate, beta1=0.5)
             trainer = opt.minimize(loss, var_list=tarin_vars)
@@ -192,14 +193,12 @@ class CondGANTrainer(object):
 
     def prepare_trainer(self, discriminator_loss, generator_loss, hr_discriminator_loss, hr_generator_loss):
         ft_lr_retio = cfg.TRAIN.FT_LR_RETIO
-        self.discriminator_trainer = self.define_one_trainer(discriminator_loss, self.discriminator_lr * ft_lr_retio,
-                                                             'd_')
+        self.discriminator_trainer = self.define_one_trainer(discriminator_loss, self.discriminator_lr * ft_lr_retio, 'd_')
         self.generator_trainer = self.define_one_trainer(generator_loss, self.generator_lr * ft_lr_retio, 'g_')
         self.hr_discriminator_trainer = self.define_one_trainer(hr_discriminator_loss, self.discriminator_lr, 'hr_d_')
         self.hr_generator_trainer = self.define_one_trainer(hr_generator_loss, self.generator_lr, 'hr_g_')
 
-        self.ft_generator_trainer = self.define_one_trainer(hr_generator_loss,
-                                                            self.generator_lr * cfg.TRAIN.FT_LR_RETIO, 'g_')
+        self.ft_generator_trainer = self.define_one_trainer(hr_generator_loss, self.generator_lr * cfg.TRAIN.FT_LR_RETIO, 'g_')
 
         self.log_vars.append(("hr_d_learning_rate", self.discriminator_lr))
         self.log_vars.append(("hr_g_learning_rate", self.generator_lr))
@@ -311,10 +310,6 @@ class CondGANTrainer(object):
             print("Reading model parameters from %s" % self.model_path)
             all_vars = tf.trainable_variables()
             restore_vars = [var for var in all_vars if var.name.startswith('g_') or var.name.startswith('d_')]
-            # restore_vars = []
-            # for var in all_vars:
-            #     if var.name.startswith('g_') or var.name.startswith('d_'):
-            #         restore_vars.append(var)
             saver = tf.train.Saver(restore_vars)
             saver.restore(sess, self.model_path)
 
@@ -343,14 +338,17 @@ class CondGANTrainer(object):
             summary_writer.add_summary(ret_list[1], counter)
             log_vals = ret_list[2]
             summary_writer.add_summary(ret_list[3], counter)
+
             # train g1 and finetune g0 with the loss of g1
             feed_out_g = [self.hr_generator_trainer, self.ft_generator_trainer, self.hr_g_sum]
             _, _, hr_g_sum = sess.run(feed_out_g, feed_dict)
             summary_writer.add_summary(hr_g_sum, counter)
+
             # finetune d0 with the loss of d0
             feed_out_d = [self.discriminator_trainer, self.d_sum]
             _, d_sum = sess.run(feed_out_d, feed_dict)
             summary_writer.add_summary(d_sum, counter)
+
             # finetune g0 with the loss of g0
             feed_out_g = [self.generator_trainer, self.g_sum]
             _, g_sum = sess.run(feed_out_g, feed_dict)
@@ -554,7 +552,6 @@ class CondGANTrainer(object):
                     saver.restore(sess, self.model_path)
                     # self.eval_one_dataset(sess, self.dataset.train,
                     #                       self.log_dir, subset='train')
-                    self.eval_one_dataset(sess, self.dataset.test,
-                                          self.log_dir, subset='test')
+                    self.eval_one_dataset(sess, self.dataset.test, self.log_dir, subset='test')
                 else:
                     print("Input a valid model path.")

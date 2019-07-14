@@ -3,14 +3,10 @@ from __future__ import print_function
 
 import tensorflow as tf
 import sys
+sys.path.append('misc')
 
-sys.path.append('./misc')
-
-from custom_ops import fc, conv_batch_normalization, fc_batch_normalization, reshape, Conv2d, Deconv2d, UpSample, add
+from custom_ops import fc, conv_batch_normalization, fc_batch_normalization, reshape, Conv2d, UpSample, add
 from config import cfg
-
-# TODO:  Does template.constrct() really shared the computation
-# when multipel times of construct are done
 
 
 class CondGAN(object):
@@ -107,26 +103,28 @@ class CondGAN(object):
 
         return output_tensor
 
-    def hr_g_encode_image(self, x_var, training=True):
-        # x_var: -->s * s * 3
-        output_tensor = Conv2d(x_var, 3, 3, self.gf_dim, 1, 1, activation_fn=tf.nn.relu, name='hr_g_OT/conv2d') # s * s * gf_dim
-        output_tensor = Conv2d(output_tensor, 4, 4, self.gf_dim * 2, 2, 2, name='hr_g_OT/conv2d2') # s2 * s2 * gf_dim * 2
+    def hr_g_encode_image(self, x_var, training=True):  # input: x_var --> s * s * 3
+        # s * s * gf_dim
+        output_tensor = Conv2d(x_var, 3, 3, self.gf_dim, 1, 1, activation_fn=tf.nn.relu, name='hr_g_OT/conv2d')
+
+        # s2 * s2 * gf_dim * 2
+        output_tensor = Conv2d(output_tensor, 4, 4, self.gf_dim * 2, 2, 2, name='hr_g_OT/conv2d2')
         output_tensor = conv_batch_normalization(output_tensor, 'hr_g_OT/batch_norm', is_training=training,
                                                  activation_fn=tf.nn.relu)
-        output_tensor = Conv2d(output_tensor, 4, 4, self.gf_dim * 4, 2, 2, name='hr_g_OT/conv2d3') # s4 * s4 * gf_dim * 4
+        # s4 * s4 * gf_dim * 4
+        output_tensor = Conv2d(output_tensor, 4, 4, self.gf_dim * 4, 2, 2, name='hr_g_OT/conv2d3')
         output_tensor = conv_batch_normalization(output_tensor, 'hr_g_OT/batch_norm2', is_training=training,
                                                  activation_fn=tf.nn.relu)
         return output_tensor
 
-    def hr_g_joint_img_text(self, x_c_code, training=True):
-        # x_code: -->s4 * s4 * (ef_dim+gf_dim*4)
-        output_tensor = Conv2d(x_c_code, 3, 3, self.gf_dim * 4, 1, 1, name='hr_g_joint_OT/conv2d') # s4 * s4 * gf_dim * 4
+    def hr_g_joint_img_text(self, x_c_code, training=True):  # input: x_code: -->s4 * s4 * (ef_dim+gf_dim*4)
+        # s4 * s4 * gf_dim * 4
+        output_tensor = Conv2d(x_c_code, 3, 3, self.gf_dim * 4, 1, 1, name='hr_g_joint_OT/conv2d')
         output_tensor = conv_batch_normalization(output_tensor, 'hr_g_joint_OT/batch_norm', is_training=training,
                                                  activation_fn=tf.nn.relu)
         return output_tensor
 
-    def hr_generator(self, x_c_code, training=True):
-        # Inputs: -->s4 * s4 * gf_dim*4
+    def hr_generator(self, x_c_code, training=True):  # Input: x_c_code -->s4 * s4 * gf_dim*4
         output_tensor = UpSample(x_c_code, size=[self.s2, self.s2], method=1, align_corners=False,
                                  name='hr_gen/upsample')
         output_tensor = Conv2d(output_tensor, 3, 3, self.gf_dim * 2, 1, 1, name='hr_gen/conv2d')
@@ -147,7 +145,8 @@ class CondGAN(object):
         output_tensor = Conv2d(output_tensor, 3, 3, self.gf_dim//4, 1, 1, name='hr_gen/conv2d4')
         output_tensor = conv_batch_normalization(output_tensor, 'hr_gen/batch_norm4', is_training=training,
                                                  activation_fn=tf.nn.relu)
-        output_tensor = Conv2d(output_tensor, 3, 3, 3, 1, 1, name='hr_gen/conv2d5', activation_fn=tf.nn.tanh) # -->4s * 4s * 3
+        # -->4s * 4s * 3
+        output_tensor = Conv2d(output_tensor, 3, 3, 3, 1, 1, name='hr_gen/conv2d5', activation_fn=tf.nn.tanh)
         return output_tensor
 
     def hr_get_generator(self, x_var, c_code, is_training):
@@ -195,12 +194,16 @@ class CondGAN(object):
         # input: s * s * 3
         node1_0 = Conv2d(inputs, 4, 4, self.df_dim, 2, 2, activation_fn=tf.nn.leaky_relu, name='d_n1.0/conv2d',
                          reuse=if_reuse)  # s2 * s2 * df_dim
-        node1_0 = Conv2d(node1_0, 4, 4, self.df_dim * 2, 2, 2, name='d_n1.0/conv2d2', reuse=if_reuse) # s4 * s4 * df_dim*2
+
+        # s4 * s4 * df_dim*2
+        node1_0 = Conv2d(node1_0, 4, 4, self.df_dim * 2, 2, 2, name='d_n1.0/conv2d2', reuse=if_reuse)
         node1_0 = conv_batch_normalization(node1_0, 'd_n1.0/batch_norm', is_training=training,
                                            activation_fn=tf.nn.leaky_relu, reuse=if_reuse)
-        node1_0 = Conv2d(node1_0, 4, 4, self.df_dim * 4, 2, 2, name='d_n1.0/conv2d3', reuse=if_reuse) # s8 * s8 * df_dim*4
+        # s8 * s8 * df_dim*4
+        node1_0 = Conv2d(node1_0, 4, 4, self.df_dim * 4, 2, 2, name='d_n1.0/conv2d3', reuse=if_reuse)
         node1_0 = conv_batch_normalization(node1_0, 'd_n1.0/batch_norm2', is_training=training, reuse=if_reuse)
-        node1_0 = Conv2d(node1_0, 4, 4, self.df_dim * 8, 2, 2, name='d_n1.0/conv2d4', reuse=if_reuse) # s16 * s16 * df_dim*8
+        # s16 * s16 * df_dim*8
+        node1_0 = Conv2d(node1_0, 4, 4, self.df_dim * 8, 2, 2, name='d_n1.0/conv2d4', reuse=if_reuse)
         node1_0 = conv_batch_normalization(node1_0, 'd_n1.0/batch_norm3', is_training=training, reuse=if_reuse)
 
         node1_1 = Conv2d(node1_0, 1, 1, self.df_dim * 2, 1, 1, name='d_n1.1/conv2d', reuse=if_reuse)
@@ -234,26 +237,34 @@ class CondGAN(object):
     def hr_d_encode_image(self, inputs=None, training=True, if_reuse=None):
         #  input:  4s * 4s * 3
         node1_0 = Conv2d(inputs, 4, 4, self.df_dim, 2, 2, activation_fn=tf.nn.leaky_relu,
-                         name='hr_d_encode_n1.0/conv2d1', reuse=if_reuse) # 2s * 2s * df_dim
-        node1_0 = Conv2d(node1_0, 4, 4, self.df_dim * 2, 2, 2, name='hr_d_encode_n1.0/conv2d2', reuse=if_reuse) # s * s * df_dim*2
+                         name='hr_d_encode_n1.0/conv2d1', reuse=if_reuse)  # 2s * 2s * df_dim
+
+        # s * s * df_dim*2
+        node1_0 = Conv2d(node1_0, 4, 4, self.df_dim * 2, 2, 2, name='hr_d_encode_n1.0/conv2d2', reuse=if_reuse)
         node1_0 = conv_batch_normalization(node1_0, 'hr_d_encode_n1.0/batch_norm', is_training=training,
                                            activation_fn=tf.nn.leaky_relu, reuse=if_reuse)
-        node1_0 = Conv2d(node1_0, 4, 4, self.df_dim * 4, 2, 2, name='hr_d_encode_n1.0/conv2d3', reuse=if_reuse) # s2 * s2 * df_dim*4
+        # s2 * s2 * df_dim*4
+        node1_0 = Conv2d(node1_0, 4, 4, self.df_dim * 4, 2, 2, name='hr_d_encode_n1.0/conv2d3', reuse=if_reuse)
         node1_0 = conv_batch_normalization(node1_0, 'hr_d_encode_n1.0/batch_norm2', is_training=training,
                                            activation_fn=tf.nn.leaky_relu, reuse=if_reuse)
-        node1_0 = Conv2d(node1_0, 4, 4, self.df_dim * 8, 2, 2, name='hr_d_encode_n1.0/conv2d4', reuse=if_reuse) # s4 * s4 * df_dim*8
+        # s4 * s4 * df_dim*8
+        node1_0 = Conv2d(node1_0, 4, 4, self.df_dim * 8, 2, 2, name='hr_d_encode_n1.0/conv2d4', reuse=if_reuse)
         node1_0 = conv_batch_normalization(node1_0, 'hr_d_encode_n1.0/batch_norm3', is_training=training,
                                            activation_fn=tf.nn.leaky_relu, reuse=if_reuse)
-        node1_0 = Conv2d(node1_0, 4, 4, self.df_dim * 16, 2, 2, name='hr_d_encode_n1.0/conv2d5', reuse=if_reuse) # s8 * s8 * df_dim*16
+        # s8 * s8 * df_dim*16
+        node1_0 = Conv2d(node1_0, 4, 4, self.df_dim * 16, 2, 2, name='hr_d_encode_n1.0/conv2d5', reuse=if_reuse)
         node1_0 = conv_batch_normalization(node1_0, 'hr_d_encode_n1.0/batch_norm4', is_training=training,
                                            activation_fn=tf.nn.leaky_relu, reuse=if_reuse)
-        node1_0 = Conv2d(node1_0, 4, 4, self.df_dim * 32, 2, 2, name='hr_d_encode_n1.0/conv2d6', reuse=if_reuse) # s16 * s16 * df_dim*32
+        # s16 * s16 * df_dim*32
+        node1_0 = Conv2d(node1_0, 4, 4, self.df_dim * 32, 2, 2, name='hr_d_encode_n1.0/conv2d6', reuse=if_reuse)
         node1_0 = conv_batch_normalization(node1_0, 'hr_d_encode_n1.0/batch_norm5', is_training=training,
                                            activation_fn=tf.nn.leaky_relu, reuse=if_reuse)
-        node1_0 = Conv2d(node1_0, 1, 1, self.df_dim * 16, 1, 1, name='hr_d_encode_n1.0/conv2d7', reuse=if_reuse) # s16 * s16 * df_dim*16
+        # s16 * s16 * df_dim*16
+        node1_0 = Conv2d(node1_0, 1, 1, self.df_dim * 16, 1, 1, name='hr_d_encode_n1.0/conv2d7', reuse=if_reuse)
         node1_0 = conv_batch_normalization(node1_0, 'hr_d_encode_n1.0/batch_norm6', is_training=training,
                                            activation_fn=tf.nn.leaky_relu, reuse=if_reuse)
-        node1_0 = Conv2d(node1_0, 1, 1, self.df_dim * 8, 1, 1, name='hr_d_encode_n1.0/conv2d8', reuse=if_reuse) # s16 * s16 * df_dim*8
+        # s16 * s16 * df_dim*8
+        node1_0 = Conv2d(node1_0, 1, 1, self.df_dim * 8, 1, 1, name='hr_d_encode_n1.0/conv2d8', reuse=if_reuse)
         node1_0 = conv_batch_normalization(node1_0, 'hr_d_encode_n1.0/batch_norm7', is_training=training,
                                            reuse=if_reuse)
 
@@ -274,7 +285,8 @@ class CondGAN(object):
 
     def hr_get_discriminator(self, x_var, c_var, is_training, no_reuse=None):
         if cfg.GAN.NETWORK_TYPE == "default":
-            x_code = self.hr_d_encode_image(training=is_training, inputs=x_var, if_reuse=no_reuse)  # s16 * s16 * df_dim*8
+            # s16 * s16 * df_dim*8
+            x_code = self.hr_d_encode_image(training=is_training, inputs=x_var, if_reuse=no_reuse)
 
             c_code = self.context_embedding(inputs=c_var, if_reuse=no_reuse)
             c_code = tf.expand_dims(tf.expand_dims(c_code, 1), 1)

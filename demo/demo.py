@@ -1,11 +1,9 @@
 from __future__ import division
 from __future__ import print_function
 
-# import prettytensor as pt
 import tensorflow as tf
 import numpy as np
 import imageio
-# import scipy.misc
 import os
 import argparse
 import torchfile
@@ -13,11 +11,11 @@ from PIL import Image, ImageDraw, ImageFont
 import re
 
 import sys
-sys.path.append('./misc')
+sys.path.append('misc')
 sys.path.append('stageII')
 
 from config import cfg, cfg_from_file
-from utils import mkdir_p
+from utils import mkdir_p, caption_convert
 from model import CondGAN
 from skimage.transform import resize
 
@@ -54,7 +52,7 @@ def build_model(sess, embedding_dim, batch_size):
     model = CondGAN(lr_imsize=cfg.TEST.LR_IMSIZE, hr_lr_ratio=int(cfg.TEST.HR_IMSIZE/cfg.TEST.LR_IMSIZE))
 
     embeddings = tf.placeholder(tf.float32, [batch_size, embedding_dim], name='conditional_embeddings')
-    # with pt.defaults_scope(phase=pt.Phase.test):
+
     with tf.variable_scope("g_net"):
         c = sample_encoded_context(embeddings, model)
         z = tf.random_normal([batch_size, cfg.Z_DIM])
@@ -67,14 +65,13 @@ def build_model(sess, embedding_dim, batch_size):
     if ckt_path.find('.ckpt') != -1:
         print("Reading model parameters from %s" % ckt_path)
         saver = tf.train.Saver(tf.global_variables())
-        # saver = tf.train.Saver(tf.all_variables())
         saver.restore(sess, ckt_path)
     else:
         print("Input a valid model path.")
     return embeddings, fake_images, hr_fake_images
 
-
 def drawCaption(img, caption):
+    caption = caption_convert(caption)
     img_txt = Image.fromarray(img)
     # get a font
     fnt = ImageFont.truetype('Pillow/Tests/fonts/FreeMono.ttf', 50)
@@ -108,7 +105,7 @@ def save_super_images(sample_batchs, hr_sample_batchs, captions_batch, batch_siz
     # Save up to 16 samples for each text embedding/sentence
     img_shape = hr_sample_batchs[0][0].shape
     for j in range(batch_size):
-        if not re.search('[a-zA-Z]+', captions_batch[j]):
+        if not re.search(b'[a-zA-Z]+', captions_batch[j]):
             continue
 
         padding = np.zeros(img_shape)
@@ -207,4 +204,4 @@ if __name__ == "__main__":
         print('Finish generating samples for %d sentences:' % num_embeddings)
         print('Example sentences:')
         for i in range(np.minimum(10, num_embeddings)):
-            print('Sentence %d: %s' % (i, captions_list[i]))
+            print('Sentence %d: %s' % (i, caption_convert(captions_list[i])))
