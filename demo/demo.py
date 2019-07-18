@@ -70,6 +70,7 @@ def build_model(sess, embedding_dim, batch_size):
         print("Input a valid model path.")
     return embeddings, fake_images, hr_fake_images
 
+
 def drawCaption(img, caption):
     caption = caption_convert(caption)
     img_txt = Image.fromarray(img)
@@ -114,6 +115,7 @@ def save_super_images(sample_batchs, hr_sample_batchs, captions_batch, batch_siz
         # First row with up to 8 samples
         for i in range(np.minimum(8, len(sample_batchs))):
             lr_img = sample_batchs[i][j]
+            lr_img = (lr_img + 1.0) * 127.5
             hr_img = hr_sample_batchs[i][j]
             hr_img = (hr_img + 1.0) * 127.5
             re_sample = resize(lr_img, hr_img.shape[:2])
@@ -129,6 +131,7 @@ def save_super_images(sample_batchs, hr_sample_batchs, captions_batch, batch_siz
             row2 = [padding]
             for i in range(8, len(sample_batchs)):
                 lr_img = sample_batchs[i][j]
+                lr_img = (lr_img + 1.0) * 127.5
                 hr_img = hr_sample_batchs[i][j]
                 hr_img = (hr_img + 1.0) * 127.5
                 re_sample = resize(lr_img, hr_img.shape[:2])

@@ -1,7 +1,6 @@
 from __future__ import division
 from __future__ import print_function
 
-import os.path as osp
 import numpy as np
 from easydict import EasyDict as edict
 
@@ -48,7 +47,8 @@ __C.TRAIN.B_WRONG = True
 __C.TRAIN.COEFF = edict()
 __C.TRAIN.COEFF.KL = 2.0
 
-__C.TRAIN.FINETUNE_LR = True  # False
+# For Stage II training
+__C.TRAIN.FINETUNE_LR = False
 __C.TRAIN.FT_LR_RETIO = 0.1
 
 # Modal options
@@ -69,7 +69,6 @@ def _merge_a_into_b(a, b):
     for k, v in a.items():
         # a must specify keys that are in b
         if k not in b:
-        #if not b.has_key(k):
             raise KeyError('{} is not a valid config key'.format(k))
 
         # the types must match, too

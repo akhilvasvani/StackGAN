@@ -2,14 +2,14 @@
 Skip-thought vectors
 https://github.com/ryankiros/skip-thoughts
 '''
-import os
+# import os
+import warnings
 
 import theano
 import theano.tensor as tensor
 
-import cPickle as pkl
+import pickle as pkl
 import numpy
-import copy
 import nltk
 
 from collections import OrderedDict, defaultdict
@@ -34,10 +34,10 @@ def load_model():
 	Load the model with saved tables
 	"""
 	# Load model options
-	print 'Loading model parameters...'
-	with open('%s.pkl'%path_to_umodel, 'rb') as f:
+	print('Loading model parameters...')
+	with open('%s.pkl' % path_to_umodel, 'rb') as f:
 		uoptions = pkl.load(f)
-	with open('%s.pkl'%path_to_bmodel, 'rb') as f:
+	with open('%s.pkl' % path_to_bmodel, 'rb') as f:
 		boptions = pkl.load(f)
 
 	# Load parameters
@@ -49,19 +49,19 @@ def load_model():
 	btparams = init_tparams(bparams)
 
 	# Extractor functions
-	print 'Compiling encoders...'
+	print('Compiling encoders...')
 	embedding, x_mask, ctxw2v = build_encoder(utparams, uoptions)
 	f_w2v = theano.function([embedding, x_mask], ctxw2v, name='f_w2v')
 	embedding, x_mask, ctxw2v = build_encoder_bi(btparams, boptions)
 	f_w2v2 = theano.function([embedding, x_mask], ctxw2v, name='f_w2v2')
 
 	# Tables
-	print 'Loading tables...'
+	print('Loading tables...')
 	utable, btable = load_tables()
 
 	# Store everything we need in a dictionary
-	print 'Packing up...'
-	model = {}
+	print('Packing up...')
+	model = dict()
 	model['uoptions'] = uoptions
 	model['boptions'] = boptions
 	model['utable'] = utable
@@ -96,7 +96,7 @@ def encode(model, X, use_norm=True, verbose=True, batch_size=128, use_eos=False)
 	X = preprocess(X)
 
 	# word dictionary and init
-	d = defaultdict(lambda : 0)
+	d = defaultdict(lambda: 0)
 	for w in model['utable'].keys():
 		d[w] = 1
 	ufeatures = numpy.zeros((len(X), model['uoptions']['dim']), dtype='float32')
@@ -105,14 +105,14 @@ def encode(model, X, use_norm=True, verbose=True, batch_size=128, use_eos=False)
 	# length dictionary
 	ds = defaultdict(list)
 	captions = [s.split() for s in X]
-	for i,s in enumerate(captions):
+	for i, s in enumerate(captions):
 		ds[len(s)].append(i)
 
 	# Get features. This encodes by length, in order to avoid wasting computation
 	for k in ds.keys():
 		if verbose:
-			print k
-		numbatches = len(ds[k]) / batch_size + 1
+			print(k)
+		numbatches = len(ds[k]) // batch_size + 1
 		for minibatch in range(numbatches):
 			caps = ds[k][minibatch::numbatches]
 
@@ -126,20 +126,20 @@ def encode(model, X, use_norm=True, verbose=True, batch_size=128, use_eos=False)
 				caption = captions[c]
 				for j in range(len(caption)):
 					if d[caption[j]] > 0:
-						uembedding[j,ind] = model['utable'][caption[j]]
-						bembedding[j,ind] = model['btable'][caption[j]]
+						uembedding[j, ind] = model['utable'][caption[j]]
+						bembedding[j, ind] = model['btable'][caption[j]]
 					else:
-						uembedding[j,ind] = model['utable']['UNK']
-						bembedding[j,ind] = model['btable']['UNK']
+						uembedding[j, ind] = model['utable']['UNK']
+						bembedding[j, ind] = model['btable']['UNK']
 				if use_eos:
-					uembedding[-1,ind] = model['utable']['<eos>']
-					bembedding[-1,ind] = model['btable']['<eos>']
+					uembedding[-1, ind] = model['utable']['<eos>']
+					bembedding[-1, ind] = model['btable']['<eos>']
 			if use_eos:
-				uff = model['f_w2v'](uembedding, numpy.ones((len(caption)+1,len(caps)), dtype='float32'))
-				bff = model['f_w2v2'](bembedding, numpy.ones((len(caption)+1,len(caps)), dtype='float32'))
+				uff = model['f_w2v'](uembedding, numpy.ones((len(caption)+1, len(caps)), dtype='float32'))
+				bff = model['f_w2v2'](bembedding, numpy.ones((len(caption)+1, len(caps)), dtype='float32'))
 			else:
-				uff = model['f_w2v'](uembedding, numpy.ones((len(caption),len(caps)), dtype='float32'))
-				bff = model['f_w2v2'](bembedding, numpy.ones((len(caption),len(caps)), dtype='float32'))
+				uff = model['f_w2v'](uembedding, numpy.ones((len(caption), len(caps)), dtype='float32'))
+				bff = model['f_w2v2'](bembedding, numpy.ones((len(caption), len(caps)), dtype='float32'))
 			if use_norm:
 				for j in range(len(uff)):
 					uff[j] /= norm(uff[j])
@@ -180,10 +180,10 @@ def nn(model, text, vectors, query, k=5):
 	scores = numpy.dot(qf, vectors.T).flatten()
 	sorted_args = numpy.argsort(scores)[::-1]
 	sentences = [text[a] for a in sorted_args[:k]]
-	print 'QUERY: ' + query
-	print 'NEAREST: '
+	print('QUERY: ' + query)
+	print('NEAREST: ')
 	for i, s in enumerate(sentences):
-		print s, sorted_args[i]
+		print(s, sorted_args[i])
 
 
 def word_features(table):
@@ -207,17 +207,17 @@ def nn_words(table, wordvecs, query, k=10):
 	scores = numpy.dot(qf, wordvecs.T).flatten()
 	sorted_args = numpy.argsort(scores)[::-1]
 	words = [keys[a] for a in sorted_args[:k]]
-	print 'QUERY: ' + query
-	print 'NEAREST: '
+	print('QUERY: ' + query)
+	print('NEAREST: ')
 	for i, w in enumerate(words):
-		print w
+		print(w)
 
 
 def _p(pp, name):
 	"""
 	make prefix-appended name
 	"""
-	return '%s_%s'%(pp, name)
+	return '%s_%s' % (pp, name)
 
 
 def init_tparams(params):
@@ -225,7 +225,7 @@ def init_tparams(params):
 	initialize Theano shared variables according to the initial parameters
 	"""
 	tparams = OrderedDict()
-	for kk, pp in params.iteritems():
+	for kk, pp in params.items():
 		tparams[kk] = theano.shared(params[kk], name=kk)
 	return tparams
 
@@ -235,9 +235,9 @@ def load_params(path, params):
 	load parameters
 	"""
 	pp = numpy.load(path)
-	for kk, vv in params.iteritems():
+	for kk, vv in params.items():
 		if kk not in pp:
-			warnings.warn('%s is not in the archive'%kk)
+			warnings.warn('%s is not in the archive' % kk)
 			continue
 		params[kk] = pp[kk]
 	return params
@@ -245,6 +245,7 @@ def load_params(path, params):
 
 # layers: 'name': ('parameter initializer', 'feedforward')
 layers = {'gru': ('param_init_gru', 'gru_layer')}
+
 
 def get_layer(name):
 	fns = layers[name]
@@ -261,8 +262,8 @@ def init_params(options):
 	params['Wemb'] = norm_weight(options['n_words_src'], options['dim_word'])
 
 	# encoder: GRU
-	params = get_layer(options['encoder'])[0](options, params, prefix='encoder',
-											  nin=options['dim_word'], dim=options['dim'])
+	params = get_layer(options['encoder'])[0](options, params, prefix='encoder', nin=options['dim_word'],
+											  dim=options['dim'])
 	return params
 
 
@@ -276,10 +277,10 @@ def init_params_bi(options):
 	params['Wemb'] = norm_weight(options['n_words_src'], options['dim_word'])
 
 	# encoder: GRU
-	params = get_layer(options['encoder'])[0](options, params, prefix='encoder',
-											  nin=options['dim_word'], dim=options['dim'])
-	params = get_layer(options['encoder'])[0](options, params, prefix='encoder_r',
-											  nin=options['dim_word'], dim=options['dim'])
+	params = get_layer(options['encoder'])[0](options, params, prefix='encoder', nin=options['dim_word'],
+											  dim=options['dim'])
+	params = get_layer(options['encoder'])[0](options, params, prefix='encoder_r', nin=options['dim_word'],
+											  dim=options['dim'])
 	return params
 
 
@@ -292,9 +293,7 @@ def build_encoder(tparams, options):
 	x_mask = tensor.matrix('x_mask', dtype='float32')
 
 	# encoder
-	proj = get_layer(options['encoder'])[1](tparams, embedding, options,
-											prefix='encoder',
-											mask=x_mask)
+	proj = get_layer(options['encoder'])[1](tparams, embedding, options, prefix='encoder', mask=x_mask)
 	ctx = proj[0][-1]
 
 	return embedding, x_mask, ctx
@@ -311,12 +310,8 @@ def build_encoder_bi(tparams, options):
 	xr_mask = x_mask[::-1]
 
 	# encoder
-	proj = get_layer(options['encoder'])[1](tparams, embedding, options,
-											prefix='encoder',
-											mask=x_mask)
-	projr = get_layer(options['encoder'])[1](tparams, embeddingr, options,
-											 prefix='encoder_r',
-											 mask=xr_mask)
+	proj = get_layer(options['encoder'])[1](tparams, embedding, options, prefix='encoder', mask=x_mask)
+	projr = get_layer(options['encoder'])[1](tparams, embeddingr, options, prefix='encoder_r', mask=xr_mask)
 
 	ctx = tensor.concatenate([proj[0][-1], projr[0][-1]], axis=1)
 
@@ -330,10 +325,10 @@ def ortho_weight(ndim):
 	return u.astype('float32')
 
 
-def norm_weight(nin,nout=None, scale=0.1, ortho=True):
-	if nout == None:
+def norm_weight(nin, nout=None, scale=0.1, ortho=True):
+	if nout is None:
 		nout = nin
-	if nout == nin and ortho:
+	if nout is nin and ortho:
 		W = ortho_weight(nin)
 	else:
 		W = numpy.random.uniform(low=-scale, high=scale, size=(nin, nout))
@@ -344,23 +339,21 @@ def param_init_gru(options, params, prefix='gru', nin=None, dim=None):
 	"""
 	parameter init for GRU
 	"""
-	if nin == None:
+	if nin is None:
 		nin = options['dim_proj']
-	if dim == None:
+	if dim is None:
 		dim = options['dim_proj']
-	W = numpy.concatenate([norm_weight(nin,dim),
-						   norm_weight(nin,dim)], axis=1)
-	params[_p(prefix,'W')] = W
-	params[_p(prefix,'b')] = numpy.zeros((2 * dim,)).astype('float32')
-	U = numpy.concatenate([ortho_weight(dim),
-						   ortho_weight(dim)], axis=1)
-	params[_p(prefix,'U')] = U
+	W = numpy.concatenate([norm_weight(nin, dim), norm_weight(nin, dim)], axis=1)
+	params[_p(prefix, 'W')] = W
+	params[_p(prefix, 'b')] = numpy.zeros((2 * dim,)).astype('float32')
+	U = numpy.concatenate([ortho_weight(dim), ortho_weight(dim)], axis=1)
+	params[_p(prefix, 'U')] = U
 
 	Wx = norm_weight(nin, dim)
-	params[_p(prefix,'Wx')] = Wx
+	params[_p(prefix, 'Wx')] = Wx
 	Ux = ortho_weight(dim)
-	params[_p(prefix,'Ux')] = Ux
-	params[_p(prefix,'bx')] = numpy.zeros((dim,)).astype('float32')
+	params[_p(prefix, 'Ux')] = Ux
+	params[_p(prefix, 'bx')] = numpy.zeros((dim,)).astype('float32')
 
 	return params
 
@@ -375,9 +368,9 @@ def gru_layer(tparams, state_below, options, prefix='gru', mask=None, **kwargs):
 	else:
 		n_samples = 1
 
-	dim = tparams[_p(prefix,'Ux')].shape[1]
+	dim = tparams[_p(prefix, 'Ux')].shape[1]
 
-	if mask == None:
+	if mask is None:
 		mask = tensor.alloc(1., state_below.shape[0], 1)
 
 	def _slice(_x, n, dim):
@@ -404,21 +397,18 @@ def gru_layer(tparams, state_below, options, prefix='gru', mask=None, **kwargs):
 		h = tensor.tanh(preactx)
 
 		h = u * h_ + (1. - u) * h
-		h = m_[:,None] * h + (1. - m_)[:,None] * h_
+		h = m_[:, None] * h + (1. - m_)[:, None] * h_
 
 		return h
 
 	seqs = [mask, state_below_, state_belowx]
 	_step = _step_slice
 
-	rval, updates = theano.scan(_step,
-								sequences=seqs,
-								outputs_info = [tensor.alloc(0., n_samples, dim)],
-								non_sequences = [tparams[_p(prefix, 'U')],
-												 tparams[_p(prefix, 'Ux')]],
+	rval, updates = theano.scan(_step, sequences=seqs, outputs_info=[tensor.alloc(0., n_samples, dim)],
+								non_sequences=[tparams[_p(prefix, 'U')], tparams[_p(prefix, 'Ux')]],
 								name=_p(prefix, '_layers'),
 								n_steps=nsteps,
 								profile=profile,
 								strict=True)
-	rval = [rval]
+	rval=[rval]
 	return rval

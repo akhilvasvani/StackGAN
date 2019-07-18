@@ -8,10 +8,9 @@ from __future__ import print_function
 import numpy as np
 import os
 import errno
-
-# > Python3
-from skimage.transform import resize
 import imageio
+
+from skimage.transform import resize
 
 
 def get_image(image_path, image_size, is_crop=False, bbox=None):
@@ -47,12 +46,7 @@ def transform(image, image_size, is_crop, bbox):
     if is_crop:
         image = custom_crop(image, bbox)
     transformed_image = resize(image, [image_size, image_size], order=3)
-    # order = 3 means bicubic
-    #https: // scikit - image.org / docs / dev / api / skimage.transform.html  # skimage.transform.resize
-
-        #scipy.misc.imresize(image, [image_size, image_size], 'bicubic')
     return transformed_image
-    #return np.array(transformed_image)
 
 
 def imread(path):
@@ -76,8 +70,10 @@ def convert_to_uint8(img):
     img = img.astype(np.uint8)
     return img
 
+
 def caption_convert(caption):
     return caption.decode("utf-8")
+
 
 def mkdir_p(path):
     try:

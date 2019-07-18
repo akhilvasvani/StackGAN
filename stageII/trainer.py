@@ -480,6 +480,7 @@ class CondGANTrainer(object):
             row2 = [padding0, real_img, padding]
             for i in range(np.minimum(8, numSamples)):
                 lr_img = sample_batchs[i][j]
+                lr_img = (lr_img + 1.0) * 127.5
                 hr_img = hr_sample_batchs[i][j]
                 hr_img = (hr_img + 1.0) * 127.5
                 re_sample = resize(lr_img, hr_img.shape[:2])
@@ -495,6 +496,7 @@ class CondGANTrainer(object):
                 row2 = [padding0, real_img, padding]
                 for i in range(8, len(sample_batchs)):
                     lr_img = sample_batchs[i][j]
+                    lr_img = (lr_img + 1.0) * 127.5
                     hr_img = hr_sample_batchs[i][j]
                     hr_img = (hr_img + 1.0) * 127.5
                     re_sample = resize(lr_img, hr_img.shape[:2])

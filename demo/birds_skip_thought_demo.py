@@ -12,9 +12,9 @@ import sys
 sys.path.append('misc')
 sys.path.append('stageII')
 
-from misc.config import cfg, cfg_from_file
-from misc.utils import mkdir_p
-from stageII.model import CondGAN
+from config import cfg, cfg_from_file
+from utils import mkdir_p
+from model import CondGAN
 from skimage.transform import resize
 
 
