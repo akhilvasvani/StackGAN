@@ -50,9 +50,9 @@ In addition, please add the project folder to PYTHONPATH and `pip install` the f
 
 
 **Pretrained Model**
-- [StackGAN for birds](https://drive.google.com/open?id=0B3y_msrWZaXLNUNKa3BaRjAyTzQ) trained from char-CNN-RNN text embeddings. Download and save it to `models/`.
-- [StackGAN for flowers](https://drive.google.com/open?id=0B3y_msrWZaXLX01FMC1JQW9vaFk) trained from char-CNN-RNN text embeddings. Download and save it to `models/`.
-- [StackGAN for birds](https://drive.google.com/open?id=0B3y_msrWZaXLZVNRNFg4d055Q1E) trained from skip-thought text embeddings. Download and save it to `models/` (Just used the same setting as the char-CNN-RNN. We assume better results can be achieved by playing with the hyper-parameters).
+- [StackGAN for birds](https://drive.google.com/open?id=1O1JHIoYO3h_qB5o27Td8KklvuLgTgpdV) trained from char-CNN-RNN text embeddings. Download and save it to `models/`.
+- [StackGAN for flowers]() trained from char-CNN-RNN text embeddings. Download and save it to `models/`.
+- [StackGAN for birds](https://drive.google.com/open?id=1O1JHIoYO3h_qB5o27Td8KklvuLgTgpdV) trained from skip-thought text embeddings. Download and save it to `models/` (Just used the same setting as the char-CNN-RNN. We assume better results can be achieved by playing with the hyper-parameters).
 
 
 
