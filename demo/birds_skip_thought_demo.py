@@ -12,6 +12,7 @@ import sys
 sys.path.append('misc')
 sys.path.append('stageII')
 
+import skipthoughts
 from config import cfg, cfg_from_file
 from utils import mkdir_p
 from model import CondGAN
