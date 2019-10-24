@@ -97,7 +97,7 @@ booktitle = {{ICCV}},
 
 **Future**
 
-[Fashion Expansion](https://github.com/arianhosseini/StackGAN)
+[Fashion Expansion](https://github.com/1o0ko/StackGAN-v1-TensorFlow)
 
 [Fashion Dataset](https://github.com/ayushidalmia/awesome-fashion-ai#datasets)
 
