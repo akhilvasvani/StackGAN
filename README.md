@@ -95,6 +95,11 @@ booktitle = {{ICCV}},
 - [StackGAN++: Realistic Image Synthesis with Stacked Generative Adversarial Networks](https://arxiv.org/abs/1710.10916)
 - [AttnGAN: Fine-Grained Text to Image Generation with Attentional Generative Adversarial Networks](https://arxiv.org/abs/1711.10485) [[supplementary]](https://1drv.ms/b/s!Aj4exx_cRA4ghK5-kUG-EqH7hgknUA) [[code]](https://github.com/taoxugit/AttnGAN)
 
+**Future**
+
+[Fashion Expansion](https://github.com/arianhosseini/StackGAN)
+[Fashion Dataset](https://github.com/ayushidalmia/awesome-fashion-ai#datasets)
+
 **References**
 
 - Generative Adversarial Text-to-Image Synthesis [Paper](https://arxiv.org/abs/1605.05396) [Code](https://github.com/reedscot/icml2016)
