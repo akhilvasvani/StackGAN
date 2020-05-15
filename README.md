@@ -31,7 +31,12 @@ In addition, please add the project folder to PYTHONPATH and `pip install` the f
 **Data**
 
 1. Download our preprocessed char-CNN-RNN text embeddings for [birds](https://drive.google.com/open?id=0B3y_msrWZaXLT1BZdVdycDY5TEE) and [flowers](https://drive.google.com/open?id=0B3y_msrWZaXLaUc0UXpmcnhaVmM) and save them to `Data/`.
+
   - [Optional] Follow the instructions [reedscot/icml2016](https://github.com/reedscot/icml2016) to download the pretrained char-CNN-RNN text encoders and extract text embeddings.
+
+  - [Optional] Download our preprocessed skip-thoughts text embeddings for [birds](https://drive.google.com/open?id=10jlSsU3g2ywDFXgUmn2Dh_UJCkQectzy) and save them to `Data/`.
+
+
 2. Download the [birds](http://www.vision.caltech.edu/visipedia/CUB-200-2011.html) and [flowers](http://www.robots.ox.ac.uk/~vgg/data/flowers/102/) image data. Extract them to `Data/birds/` and `Data/flowers/`, respectively.
 3. Preprocess images.
   - For birds: `python misc/preprocess_birds.py`
@@ -52,7 +57,7 @@ In addition, please add the project folder to PYTHONPATH and `pip install` the f
 **Pretrained Model**
 - [StackGAN for birds](https://drive.google.com/open?id=1O1JHIoYO3h_qB5o27Td8KklvuLgTgpdV) trained from char-CNN-RNN text embeddings. Download and save it to `models/`.
 - [StackGAN for flowers]() trained from char-CNN-RNN text embeddings. Download and save it to `models/`.
-- [StackGAN for birds](https://drive.google.com/open?id=1O1JHIoYO3h_qB5o27Td8KklvuLgTgpdV) trained from skip-thought text embeddings. Download and save it to `models/` (Just used the same setting as the char-CNN-RNN. We assume better results can be achieved by playing with the hyper-parameters).
+- [StackGAN for birds]() trained from skip-thought text embeddings. Download and save it to `models/` (Just used the same setting as the char-CNN-RNN. We assume better results can be achieved by playing with the hyper-parameters).
 
 
 
